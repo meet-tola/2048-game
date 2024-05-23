@@ -150,7 +150,7 @@ const Game2048 = () => {
             </div>
           ))}
         </div>
-        <p className="text-lg font-medium w-[30rem] mt-8">
+        <p className="text-lg font-medium w-80 mt-8">
           HOW TO PLAY: Use your arrow keys to move the tiles. When two tiles
           with the same number touch, they merge into one!
         </p>
