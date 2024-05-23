@@ -1,113 +1,196 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useEffect } from "react";
+import useEventListener from "@use-it/event-listener";
+import useSwipe from "./components/useSwipe";
 
-export default function Home() {
+const GRID_SIZE = 4;
+const STARTING_TILES = 2;
+
+const Game2048 = () => {
+  const [grid, setGrid] = useState(generateGrid());
+  const [score, setScore] = useState(0);
+  const [mergeAnimations, setMergeAnimations] = useState(new Set());
+
+  useEffect(() => {
+    startNewGame();
+  }, []);
+
+  const startNewGame = () => {
+    let newGrid = generateGrid();
+    addRandomTile(newGrid);
+    addRandomTile(newGrid);
+    setGrid(newGrid);
+    setScore(0);
+  };
+
+  const handleSwipe = (direction) => {
+    handleMove(direction);
+  };
+
+  useSwipe(handleSwipe);
+
+  const handleKeyDown = (event) => {
+    switch (event.key) {
+      case "ArrowUp":
+        handleMove("up");
+        break;
+      case "ArrowDown":
+        handleMove("down");
+        break;
+      case "ArrowLeft":
+        handleMove("left");
+        break;
+      case "ArrowRight":
+        handleMove("right");
+        break;
+      default:
+        break;
+    }
+  };
+
+  useEventListener("keydown", handleKeyDown);
+
+  const handleMove = (direction) => {
+    let newGrid;
+    let newMergeAnimations = new Set();
+    switch (direction) {
+      case "up":
+        newGrid = slideUp(grid, newMergeAnimations);
+        break;
+      case "down":
+        newGrid = slideDown(grid, newMergeAnimations);
+        break;
+      case "left":
+        newGrid = slideLeft(grid, newMergeAnimations);
+        break;
+      case "right":
+        newGrid = slideRight(grid, newMergeAnimations);
+        break;
+      default:
+        return;
+    }
+
+    if (newGrid !== grid) {
+      addRandomTile(newGrid);
+      setGrid([...newGrid]);
+      setMergeAnimations(newMergeAnimations);
+      setTimeout(() => setMergeAnimations(new Set()), 200);
+    }
+  };
+
+  const slideRowLeft = (row, mergeAnimations) => {
+    let newRow = row.filter((tile) => tile !== 0);
+    for (let i = 0; i < newRow.length - 1; i++) {
+      if (newRow[i] === newRow[i + 1]) {
+        newRow[i] *= 2;
+        setScore((score) => score + newRow[i]);
+        mergeAnimations.add(`${i}-${newRow[i]}`);
+        newRow.splice(i + 1, 1);
+      }
+    }
+    return [...newRow, ...Array(GRID_SIZE - newRow.length).fill(0)];
+  };
+
+  const slideLeft = (grid, mergeAnimations) => {
+    return grid.map((row) => slideRowLeft(row, mergeAnimations));
+  };
+
+  const slideRight = (grid, mergeAnimations) => {
+    return grid.map((row) =>
+      slideRowLeft(row.reverse(), mergeAnimations).reverse()
+    );
+  };
+
+  const slideUp = (grid, mergeAnimations) => {
+    let newGrid = transpose(grid);
+    newGrid = slideLeft(newGrid, mergeAnimations);
+    return transpose(newGrid);
+  };
+
+  const slideDown = (grid, mergeAnimations) => {
+    let newGrid = transpose(grid);
+    newGrid = slideRight(newGrid, mergeAnimations);
+    return transpose(newGrid);
+  };
+
+  const transpose = (grid) => {
+    let newGrid = Array.from(Array(GRID_SIZE), () => Array(GRID_SIZE).fill(0));
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        newGrid[col][row] = grid[row][col];
+      }
+    }
+    return newGrid;
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <div className="min-h-screen flex items-center justify-center bg-blue-100">
+      <div className="flex items-center justify-center flex-col mb-8">
+        <div className="flex w-80 justify-between items-center">
+          <div className="text-[40px] font-bold">2048</div>
+          <div className="flex gap-5 items-center">
+            <button
+              className="mb-4 px-4 py-2 bg-blue-500 text-white rounded"
+              onClick={startNewGame}
+            >
+              Restart
+            </button>
+            <p className="text-xl font-bold mb-4">Score: {score}</p>
+          </div>
         </div>
+        <div className="w-80 h-80 grid grid-cols-4 gap-1 bg-gray-300 p-2 rounded-xl">
+          {grid.flat().map((tile, index) => (
+            <div
+              key={index}
+              className={`h-16 w-16 flex items-center justify-center rounded-sm text-[35px] font-bold ${
+                tileColors[tile] || "bg-gray-400"
+              } text-white`}
+            >
+              {tile !== 0 && tile}
+            </div>
+          ))}
+        </div>
+        <p className="text-lg font-medium w-[30rem] mt-8">
+          HOW TO PLAY: Use your arrow keys to move the tiles. When two tiles
+          with the same number touch, they merge into one!
+        </p>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
   );
-}
+};
+
+const generateGrid = () => {
+  return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+};
+
+const addRandomTile = (grid) => {
+  const emptyTiles = [];
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      if (grid[row][col] === 0) {
+        emptyTiles.push({ row, col });
+      }
+    }
+  }
+  if (emptyTiles.length > 0) {
+    const { row, col } =
+      emptyTiles[Math.floor(Math.random() * emptyTiles.length)];
+    grid[row][col] = Math.random() < 0.9 ? 2 : 4;
+  }
+};
+
+const tileColors = {
+  2: "bg-gray-100 text-gray-700",
+  4: "bg-yellow-200 text-gray-700",
+  8: "bg-yellow-300 text-gray-700",
+  16: "bg-orange-400 text-gray-700",
+  32: "bg-orange-500 text-white",
+  64: "bg-orange-600 text-white",
+  128: "bg-red-400 text-white",
+  256: "bg-red-500 text-white",
+  512: "bg-red-600 text-white",
+  1024: "bg-purple-500 text-white",
+  2048: "bg-purple-600 text-white",
+};
+
+export default Game2048;
